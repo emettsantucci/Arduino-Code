@@ -53,8 +53,17 @@ const bool TURN_CW[3] = {false, true, true};
 const int TRUE_ZERO[2][3] = {{0, 0, 0},
                              {0, 0, 0}};
 
+//The analog pins where the encoders are plugged into
+const int ENCODER_PINS[3] = {A0, A1, A2};
+
+//the factor to adjust the drive motors' speeds by to try and keep them turning at the same speed.
+const int SPEED_ADJUST[2][3] = {{1, 1, 1},
+                                {1, 1, 1}};
+
 const int DRIVE = 1;//drive motors are on M1 on Sabertooth
 const int ARTICULATION = 2;//articulation motors are on M2
+const int DRIVE_SPEED = 50;//50/127 default speed for drive motors
+const int TURN_SPEED = 50;//50/127 default speed for articulation motors
 
 /*ROS setup*/
 /*void commandCb(const messageClass::message& msg){
@@ -78,7 +87,7 @@ void loop() {
 }
 
 void test(int currentSpeed, bool forward){
-  if(currentSpeed > 80)
+  if(currentSpeed > DRIVE_SPEED)
     forward = false;
   if(currentSpeed < 10)
     forward = true;
@@ -93,6 +102,75 @@ void test(int currentSpeed, bool forward){
   }
   delay(25);
   test(currentSpeed, forward);
+}
+
+/**
+ * function to turn the robot in place
+ * @param right whether we want to turn right or left
+ */
+void turnInPlace(bool right){
+  alignWheels(TURN_ANGLES);
+  int driveSpeed = DRIVE_SPEED;
+  if(right && ARDUINO_NUM == 1 || !right && ARDUINO_NUM == 0)
+    driveSpeed = -driveSpeed;
+  for(int i = 0; i < 3; i++){
+    runMotor(i, DRIVE, driveSpeed);
+  }
+}
+
+/**
+ * function to drive the robot forward
+ * @param forward whether we want to go forward or backward
+ */
+void driveStraight(bool forward){
+  alignWheels(DRIVE_ANGLES);
+  int driveSpeed = DRIVE_SPEED;
+  if(!forward)
+    driveSpeed = -driveSpeed;
+  for(int i = 0; i < 3; i++){
+    driveSpeed *= SPEED_ADJUST[ARDUINO_NUM][i];
+    runMotor(i, DRIVE, driveSpeed);
+  }
+}
+
+/**
+ * Align the wheels to the specified angles
+ * @param angles the angles to align the wheels to
+ */
+void alignWheels(const int angles[3]){
+  bool complete = false;
+  bool aligned[3] = {false, false, false};
+  for(int i = 0; i < 3; i++)//if a wheel is disabled, we do not want to try to align it
+    if(!enabled[ARDUINO_NUM][i])
+      aligned[i] = true;
+  while(!complete){
+    for(int i = 0; i < 3; i++){
+      if(aligned[i])
+        continue;
+      if(abs((TRUE_ZERO[ARDUINO_NUM][i] + analogRead(ENCODER_PINS[i]) * ENCODER_SCALE) - angles[i]) < 3)//CHECK THIS
+        aligned[i] = true;
+      else{
+      //CHECK THIS TOO (I think this actually works)
+        bool cw = true;
+        if((TRUE_ZERO[ARDUINO_NUM][i] + analogRead(ENCODER_PINS[i]) * ENCODER_SCALE) > angles[i])
+          cw = !cw;
+        if(!TURN_CW[i])
+          cw = !cw;
+        if(ARDUINO_NUM == 1)
+          cw = !cw;
+        if(cw){
+          runMotor(i, ARTICULATION, TURN_SPEED);
+          runMotor(i, DRIVE, DRIVE_SPEED);//check the drive directions
+        }
+        else{
+          runMotor(i, ARTICULATION, -TURN_SPEED);
+          runMotor(i, DRIVE, -DRIVE_SPEED);
+        }
+      }
+    }
+    if(aligned[0] && aligned[1] && aligned[2])
+      complete = true;
+  }
 }
 
 /**
