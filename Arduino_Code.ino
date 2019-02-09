@@ -1,4 +1,5 @@
 #include <Sabertooth.h>
+#include <SoftwareSerial.h>
 #include <ros.h>
 
 /**
@@ -11,16 +12,23 @@
  * the right side and left side controlled independentally.
  */
 
+//Use for testing and calibrating. For normal operation, make these false.
+//Open Serial Monitor to see details.
 const bool TEST_MOTORS = true;
+const bool CALIBRATE_ENCODER = false;
+const int ENCODER_TO_CALIBRATE = 0;//0-2 from front to back.
 
 const int ARDUINO_NUM = 0;//0 is left arduino, 1 is right.
+
+//In order to output human readable, useful data on the Serial Monitor
+SoftwareSerial SWSerial(NOT_A_PIN, 2);
 
 /**
  * split into two arrays of length 3 because each Arduino gets one array.
  * The array that the Arduino gets in decided by ARDUINO_NUM. This pattern continues for all constants
  */
-Sabertooth ST[2][3] = {{Sabertooth(128), Sabertooth(131), Sabertooth(132)},
-                       {Sabertooth(129), Sabertooth(130), Sabertooth(133)}};
+Sabertooth ST[2][3] = {{Sabertooth(128, SWSerial), Sabertooth(131, SWSerial), Sabertooth(132, SWSerial)},
+                       {Sabertooth(129, SWSerial), Sabertooth(130, SWSerial), Sabertooth(133, SWSerial)}};
 //6 motor controllers (LF, LM, LB, RF, RM, RB)
 
 const boolean POLARITY[2][6] = {{true, true, true,//Left Drive Motors
@@ -60,6 +68,9 @@ const int ENCODER_PINS[3] = {A0, A1, A2};
 const int SPEED_ADJUST[2][3] = {{1, 1, 1},
                                 {1, 1, 1}};
 
+//Stepper motor controller pins.
+const int STEPPER_PINS[4] = {10, 11, 12, 13};
+
 const int DRIVE = 1;//drive motors are on M1 on Sabertooth
 const int ARTICULATION = 2;//articulation motors are on M2
 const int DRIVE_SPEED = 50;//50/127 default speed for drive motors
@@ -77,13 +88,24 @@ void setup() {
   nh.subscribe(RX);
   ng.advertise(TX);*/
   
-  SabertoothTXPinSerial.begin(9600);
+  SWSerial.begin(9600);
+  Serial.begin(9600);//Used for human-readable feedback. Open Serial Monitor to view.
   if(TEST_MOTORS)
     test(0, true);
+  if(CALIBRATE_ENCODER)
+    calibrateEncoder(ENCODER_TO_CALIBRATE);
 }
 
 void loop() {
   
+}
+
+void calibrateEncoder(int controller){
+  while(ENCODER_PINS[controller] != 0){
+    runMotor(controller, ARTICULATION, 10);
+    String str = "Current Angle: ";
+    Serial.println(str + (ENCODER_PINS[controller] * ENCODER_SCALE));
+  }
 }
 
 void test(int currentSpeed, bool forward){
@@ -102,6 +124,8 @@ void test(int currentSpeed, bool forward){
   }
   delay(25);
   test(currentSpeed, forward);
+  String str = "Current speed: ";
+  Serial.println(str + currentSpeed);
 }
 
 /**
