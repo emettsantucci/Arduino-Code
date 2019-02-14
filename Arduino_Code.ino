@@ -14,14 +14,14 @@
 
 //Use for testing and calibrating. For normal operation, make these false.
 //Open Serial Monitor to see details.
-const bool TEST_MOTORS = true;
-const bool CALIBRATE_ENCODER = false;
+const bool TEST_MOTORS = false;
+const bool CALIBRATE_ENCODER = true;
 const int ENCODER_TO_CALIBRATE = 0;//0-2 from front to back.
 
 const int ARDUINO_NUM = 0;//0 is left arduino, 1 is right.
 
 //In order to output human readable, useful data on the Serial Monitor
-SoftwareSerial SWSerial(NOT_A_PIN, 2);
+SoftwareSerial SWSerial(NOT_A_PIN, 14);
 
 /**
  * split into two arrays of length 3 because each Arduino gets one array.
@@ -90,8 +90,9 @@ void setup() {
   
   SWSerial.begin(9600);
   Serial.begin(9600);//Used for human-readable feedback. Open Serial Monitor to view.
+  Serial.println("I am a robot... Bleep Bloop.");
   if(TEST_MOTORS)
-    test(0, true);
+    test(1, true);
   if(CALIBRATE_ENCODER)
     calibrateEncoder(ENCODER_TO_CALIBRATE);
 }
@@ -101,31 +102,33 @@ void loop() {
 }
 
 void calibrateEncoder(int controller){
-  while(ENCODER_PINS[controller] != 0){
+  int encoderVal = analogRead(ENCODER_PINS[controller]);
+  while(encoderVal != 0){
     runMotor(controller, ARTICULATION, 10);
     String str = "Current Angle: ";
-    Serial.println(str + (ENCODER_PINS[controller] * ENCODER_SCALE));
+    Serial.println(str + (int)(encoderVal * ENCODER_SCALE));
   }
 }
 
 void test(int currentSpeed, bool forward){
-  if(currentSpeed > DRIVE_SPEED)
-    forward = false;
-  if(currentSpeed < 10)
-    forward = true;
-  if(forward)
-    currentSpeed++;
-  else
-    currentSpeed--;
-  for(int i = 0; i < 3; i++){
-    for(int j = 1; j < 3; j++){
-      runMotor(i, j, currentSpeed);
+  while(true){
+    if(currentSpeed > DRIVE_SPEED)
+      forward = false;
+    if(currentSpeed <= 1)
+      forward = true;
+    if(forward)
+      currentSpeed++;
+    else
+      currentSpeed--;
+    for(int i = 0; i < 3; i++){
+      for(int j = 1; j < 3; j++){
+        runMotor(i, j, currentSpeed);
+      }
     }
+    delay(25);
+    String str = "Current speed: ";
+    Serial.println(str + currentSpeed);
   }
-  delay(25);
-  test(currentSpeed, forward);
-  String str = "Current speed: ";
-  Serial.println(str + currentSpeed);
 }
 
 /**
