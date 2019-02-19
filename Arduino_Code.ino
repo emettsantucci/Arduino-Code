@@ -15,8 +15,8 @@
 //Use for testing and calibrating. For normal operation, make these false.
 //Open Serial Monitor to see details.
 const bool TEST_MOTORS = false;
-const bool CALIBRATE_ENCODER = true;
-const int ENCODER_TO_CALIBRATE = 0;//0-2 from front to back.
+const bool CALIBRATE_ENCODER = false;
+const int ENCODER_TO_CALIBRATE = 1;//0-2 from front to back.
 
 const int ARDUINO_NUM = 0;//0 is left arduino, 1 is right.
 
@@ -27,8 +27,8 @@ SoftwareSerial SWSerial(NOT_A_PIN, 14);
  * split into two arrays of length 3 because each Arduino gets one array.
  * The array that the Arduino gets in decided by ARDUINO_NUM. This pattern continues for all constants
  */
-Sabertooth ST[2][3] = {{Sabertooth(128, SWSerial), Sabertooth(131, SWSerial), Sabertooth(132, SWSerial)},
-                       {Sabertooth(129, SWSerial), Sabertooth(130, SWSerial), Sabertooth(133, SWSerial)}};
+Sabertooth ST[2][3] = {{Sabertooth(129, SWSerial), Sabertooth(128, SWSerial), Sabertooth(133, SWSerial)},
+                       {Sabertooth(130, SWSerial), Sabertooth(131, SWSerial), Sabertooth(132, SWSerial)}};
 //6 motor controllers (LF, LM, LB, RF, RM, RB)
 
 const boolean POLARITY[2][6] = {{true, true, true,//Left Drive Motors
@@ -92,19 +92,18 @@ void setup() {
   Serial.begin(9600);//Used for human-readable feedback. Open Serial Monitor to view.
   Serial.println("I am a robot... Bleep Bloop.");
   if(TEST_MOTORS)
-    test(1, true);
+    test(DRIVE_SPEED, true);
   if(CALIBRATE_ENCODER)
     calibrateEncoder(ENCODER_TO_CALIBRATE);
 }
 
 void loop() {
-  
 }
 
 void calibrateEncoder(int controller){
   int encoderVal = analogRead(ENCODER_PINS[controller]);
-  while(encoderVal != 0){
-    runMotor(controller, ARTICULATION, 10);
+  while(encoderVal != 359){
+    runMotor(controller, ARTICULATION, 30);
     String str = "Current Angle: ";
     Serial.println(str + (int)(encoderVal * ENCODER_SCALE));
   }
@@ -112,20 +111,13 @@ void calibrateEncoder(int controller){
 
 void test(int currentSpeed, bool forward){
   while(true){
-    if(currentSpeed > DRIVE_SPEED)
-      forward = false;
-    if(currentSpeed <= 1)
-      forward = true;
-    if(forward)
-      currentSpeed++;
-    else
-      currentSpeed--;
+    currentSpeed = -currentSpeed;
     for(int i = 0; i < 3; i++){
       for(int j = 1; j < 3; j++){
         runMotor(i, j, currentSpeed);
       }
     }
-    delay(25);
+    delay(1000);
     String str = "Current speed: ";
     Serial.println(str + currentSpeed);
   }
