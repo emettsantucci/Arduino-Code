@@ -1,0 +1,18 @@
+For the robot's wheels, the output ports are arranged as follows:
+Header: F = Front, M = Middle, B = Back
+Subs: 	T = Top, B = Bottom
+		D = Drive, A = Articulation
+
+Note: 	Although we know that MA is TM, it doesn't work, so it is an X.
+		Also, the motor for the FLA has a broken lead.
+
+Left:
+F:
+	D: BM
+	A: BL
+M:
+	D: TR
+	A: X
+B:
+	D: TL
+	A: BR

@@ -10,33 +10,32 @@
  * 
  * This code is designed to run on two separate Arduinos,
  * the right side and left side controlled independentally.
+ * 
+ * Sabertooth documentation and libraries can be found here: https://www.dimensionengineering.com/software/SabertoothArduinoLibrary/html/index.html
+ * We are using packetized serial which means we specify the address of a Sabertooth address and then we can run the motors all from one pin.
+ * 
+ * Stepper Motors run using frequency modulation. Higher frequency = faster steps = faster turning.
  */
 
 //Use for testing and calibrating. For normal operation, make these false.
 //Open Serial Monitor to see details.
 const bool TEST_MOTORS = false;
 const bool CALIBRATE_ENCODER = false;
-const int ENCODER_TO_CALIBRATE = 1;//0-2 from front to back.
+const int ENCODER_TO_CALIBRATE = 2;//0-2 from front to back.
 
 const int ARDUINO_NUM = 0;//0 is left arduino, 1 is right.
 
-//In order to output human readable, useful data on the Serial Monitor
+//In order to output human readable, useful data goes on the Serial Monitor
+//Control for the Sabertooths goes on pin 14.
 SoftwareSerial SWSerial(NOT_A_PIN, 14);
 
 /**
  * split into two arrays of length 3 because each Arduino gets one array.
  * The array that the Arduino gets in decided by ARDUINO_NUM. This pattern continues for all constants
  */
-Sabertooth ST[2][3] = {{Sabertooth(129, SWSerial), Sabertooth(128, SWSerial), Sabertooth(133, SWSerial)},
+Sabertooth ST[2][3] = {{Sabertooth(128, SWSerial), Sabertooth(133, SWSerial), Sabertooth(129, SWSerial)},
                        {Sabertooth(130, SWSerial), Sabertooth(131, SWSerial), Sabertooth(132, SWSerial)}};
 //6 motor controllers (LF, LM, LB, RF, RM, RB)
-
-const boolean POLARITY[2][6] = {{true, true, true,//Left Drive Motors
-                                 true, true, true},//Left Art Motors
-                                {true, true, true,//Right Drive
-                                 true, true, true}};//Right Art
-//If the motors are wired backwards to how we expect,
-//change the corresponding boolean to false.
 
 //Array of booleans to tell if a particular wheel is supposed to run or not
 boolean enabled[2][3] = {{true, true, true},
@@ -62,14 +61,19 @@ const int TRUE_ZERO[2][3] = {{0, 0, 0},
                              {0, 0, 0}};
 
 //The analog pins where the encoders are plugged into
-const int ENCODER_PINS[3] = {A0, A1, A2};
+const int ENCODER_PINS[3] = {A0, A1, A0};
 
 //the factor to adjust the drive motors' speeds by to try and keep them turning at the same speed.
-const int SPEED_ADJUST[2][3] = {{1, 1, 1},
-                                {1, 1, 1}};
+const float SPEED_ADJUST[2][6] = {{1, 1, 1,  //Left Drive
+                                   1, 1, 1}, //Left Art
+                                  {1, 1, 1,  //Right Drive
+                                   1, 1, 1}};//Right Art
+//If the motors are wired backwards to how we expect,
+//change the corresponding float to negative.
 
 //Stepper motor controller pins.
-const int STEPPER_PINS[4] = {10, 11, 12, 13};
+const int STEPPER_PUL[2] = {11, 13};
+const int STEPPER_DIR[2] = {10, 12};
 
 const int DRIVE = 1;//drive motors are on M1 on Sabertooth
 const int ARTICULATION = 2;//articulation motors are on M2
@@ -91,8 +95,13 @@ void setup() {
   SWSerial.begin(9600);
   Serial.begin(9600);//Used for human-readable feedback. Open Serial Monitor to view.
   Serial.println("I am a robot... Bleep Bloop.");
+  for(int i=0; i<3; i++){
+    runWheelMotor(i, DRIVE, 0);
+    runWheelMotor(i, ARTICULATION, 0);
+  }
+  delay(1000);
   if(TEST_MOTORS)
-    test(DRIVE_SPEED, true);
+    testDrive(DRIVE_SPEED);
   if(CALIBRATE_ENCODER)
     calibrateEncoder(ENCODER_TO_CALIBRATE);
 }
@@ -103,23 +112,21 @@ void loop() {
 void calibrateEncoder(int controller){
   int encoderVal = analogRead(ENCODER_PINS[controller]);
   while(encoderVal != 359){
-    runMotor(controller, ARTICULATION, 30);
+    runWheelMotor(controller, ARTICULATION, -10);
     String str = "Current Angle: ";
-    Serial.println(str + (int)(encoderVal * ENCODER_SCALE));
+    Serial.println(str + encoderVal);
   }
 }
 
-void test(int currentSpeed, bool forward){
-  while(true){
-    currentSpeed = -currentSpeed;
-    for(int i = 0; i < 3; i++){
-      for(int j = 1; j < 3; j++){
-        runMotor(i, j, currentSpeed);
-      }
-    }
-    delay(1000);
-    String str = "Current speed: ";
-    Serial.println(str + currentSpeed);
+void testDrive(int currentSpeed){
+  String str = "Driving motor ";
+  for(int i = 0; i < 3; i++){
+    runWheelMotor(i, DRIVE, currentSpeed);
+    Serial.println(str+i);
+    delay(500);
+    runWheelMotor(i, DRIVE, -currentSpeed);
+    delay(500);
+    runWheelMotor(i, DRIVE, 0);
   }
 }
 
@@ -133,7 +140,7 @@ void turnInPlace(bool right){
   if(right && ARDUINO_NUM == 1 || !right && ARDUINO_NUM == 0)
     driveSpeed = -driveSpeed;
   for(int i = 0; i < 3; i++){
-    runMotor(i, DRIVE, driveSpeed);
+    runWheelMotor(i, DRIVE, driveSpeed);
   }
 }
 
@@ -147,8 +154,7 @@ void driveStraight(bool forward){
   if(!forward)
     driveSpeed = -driveSpeed;
   for(int i = 0; i < 3; i++){
-    driveSpeed *= SPEED_ADJUST[ARDUINO_NUM][i];
-    runMotor(i, DRIVE, driveSpeed);
+    runWheelMotor(i, DRIVE, driveSpeed);
   }
 }
 
@@ -178,12 +184,12 @@ void alignWheels(const int angles[3]){
         if(ARDUINO_NUM == 1)
           cw = !cw;
         if(cw){
-          runMotor(i, ARTICULATION, TURN_SPEED);
-          runMotor(i, DRIVE, DRIVE_SPEED);//check the drive directions
+          runWheelMotor(i, ARTICULATION, TURN_SPEED);
+          runWheelMotor(i, DRIVE, DRIVE_SPEED);//check the drive directions
         }
         else{
-          runMotor(i, ARTICULATION, -TURN_SPEED);
-          runMotor(i, DRIVE, -DRIVE_SPEED);
+          runWheelMotor(i, ARTICULATION, -TURN_SPEED);
+          runWheelMotor(i, DRIVE, -DRIVE_SPEED);
         }
       }
     }
@@ -196,16 +202,41 @@ void alignWheels(const int angles[3]){
  * runs a motor
  * @param controller The number of the controller to run (0-2)
  * @param motorNum DRIVE or ARTICULATION
- * @param vel Speed of the motor (-127-127)
+ * @param vel Speed of the motor (-127 - 127)
  */
-void runMotor(int controller, int motorNum, int vel){
+void runWheelMotor(int controller, int motorNum, int vel){
   if(!enabled[ARDUINO_NUM][controller])
     return;
-  int offset = 0;
   if(motorNum == ARTICULATION)
-    offset = 3;
-  if(POLARITY[ARDUINO_NUM][controller+offset])
-    ST[ARDUINO_NUM][controller].motor(motorNum, vel);
+    ST[ARDUINO_NUM][controller].motor(ARTICULATION, SPEED_ADJUST[ARDUINO_NUM][controller+3] * vel);
   else
-    ST[ARDUINO_NUM][controller].motor(motorNum, -vel);
+    ST[ARDUINO_NUM][controller].motor(DRIVE, SPEED_ADJUST[ARDUINO_NUM][controller] * vel);
+}
+
+/**
+ * method to run a stepper 
+ */
+void runStepperMotor(int stepper, int vel){
+  int d = getStepperDelay(vel);
+  if(d < 0)
+    digitalWrite(STEPPER_DIR[stepper], LOW);
+  else
+    digitalWrite(STEPPER_DIR[stepper], HIGH);
+  if(abs(d) < 5)
+    return;
+  digitalWrite(STEPPER_PUL[stepper], HIGH);
+  delayMicroseconds(d);
+  digitalWrite(STEPPER_PUL[stepper], LOW);
+  delayMicroseconds(d);
+}
+
+/**
+ * helper method to find the required delay for a proper frequency output
+ */
+int getStepperDelay(int vel){
+  if(vel > 100)
+    vel = 100;
+  int delayMin = 5;//200kHz max
+  int delayCur = delayMin * (100 - abs(vel));
+  return delayCur;
 }
