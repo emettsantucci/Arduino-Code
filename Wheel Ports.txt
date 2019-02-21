@@ -3,7 +3,7 @@ Header: F = Front, M = Middle, B = Back
 Subs: 	T = Top, B = Bottom
 		D = Drive, A = Articulation
 
-Note: 	Although we know that MA is TM, it doesn't work, so it is an X.
+Note: 	Although we know that MLA is TM, it doesn't work (problem is inside the EE box, so there is not voltage output on the port), so it is an X.
 		Also, the motor for the FLA has a broken lead.
 
 Left:

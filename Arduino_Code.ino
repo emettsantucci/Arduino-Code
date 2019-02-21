@@ -75,10 +75,15 @@ const float SPEED_ADJUST[2][6] = {{1, 1, 1,  //Left Drive
 const int STEPPER_PUL[2] = {11, 13};
 const int STEPPER_DIR[2] = {10, 12};
 
+//Bucket Chain Motor Controller
+Sabertooth ChainMotor = Sabertooth(134, SWSerial);
+
 const int DRIVE = 1;//drive motors are on M1 on Sabertooth
 const int ARTICULATION = 2;//articulation motors are on M2
 const int DRIVE_SPEED = 50;//50/127 default speed for drive motors
 const int TURN_SPEED = 50;//50/127 default speed for articulation motors
+const int DIG_SPEED = 50;//50/127 default speed for digger and dumper
+const int STEPPER_SPEED = 10;//10/100 default speed for raising and lowering digger and dumper
 
 /*ROS setup*/
 /*void commandCb(const messageClass::message& msg){
@@ -99,6 +104,8 @@ void setup() {
     runWheelMotor(i, DRIVE, 0);
     runWheelMotor(i, ARTICULATION, 0);
   }
+  runDigMotor(0, 0);
+  runDigMotor(1, 0);
   delay(1000);
   if(TEST_MOTORS)
     testDrive(DRIVE_SPEED);
@@ -118,16 +125,32 @@ void calibrateEncoder(int controller){
   }
 }
 
-void testDrive(int currentSpeed){
+void testDrive(int vel){
   String str = "Driving motor ";
   for(int i = 0; i < 3; i++){
-    runWheelMotor(i, DRIVE, currentSpeed);
+    runWheelMotor(i, DRIVE, vel);
     Serial.println(str+i);
     delay(500);
-    runWheelMotor(i, DRIVE, -currentSpeed);
+    runWheelMotor(i, DRIVE, -vel);
     delay(500);
     runWheelMotor(i, DRIVE, 0);
   }
+}
+
+void testStepper(int vel){
+  runStepperMotor(0, vel);
+  runStepperMotor(1, vel);
+  delay(5000);
+  runStepperMotor(0, -vel);
+  runStepperMotor(1, -vel);
+  delay(5000);
+}
+
+void testDig(int vel){
+  runDigMotor(0, vel);
+  delay(1000);
+  runDigMotor(0, -vel);
+  delay(1000);
 }
 
 /**
@@ -239,4 +262,8 @@ int getStepperDelay(int vel){
   int delayMin = 5;//200kHz max
   int delayCur = delayMin * (100 - abs(vel));
   return delayCur;
+}
+
+void runDigMotor(int motorNum, int vel){
+  ChainMotor.motor(motorNum, vel);
 }
