@@ -1,7 +1,8 @@
 #include <Sabertooth.h>
 #include <SoftwareSerial.h>
 #include <ros.h>
-
+#include <manual/MovementCommand.h>
+#include <manual/MovementFeedback.h>
 /**
  * This is the code to run on the Arduinos.
  * Assume that all the motors in arrays appear in the following order:
@@ -86,17 +87,21 @@ const int DIG_SPEED = 50;//50/127 default speed for digger and dumper
 const int STEPPER_SPEED = 10;//10/100 default speed for raising and lowering digger and dumper
 
 /*ROS setup*/
-/*void commandCb(const messageClass::message& msg){
+manual::MovementFeedback feedbackMessage;
+ros::NodeHandle nh;
+
+void messageCb( const manual::MovementCommand& msg){
   //handle command
-}*/
-//ros::Subscriber RX("Receiver", &commandCb); 
-//ros::Publisher TX("Transmitter", );
+}
+
+ros::Subscriber<manual::MovementCommand> sub("MovementPublisher", &messageCb );
+ros::Publisher movementFeedback ("MovementFeedback", &feedbackMessage);
 
 void setup() {
-  /*nh.initNode();
-  nh.subscribe(RX);
-  ng.advertise(TX);*/
-  
+  nh.initNode();
+  nh.subscribe(sub);
+  nh.advertise(movementFeedback);
+  nh.spinOnce();
   SWSerial.begin(9600);
   Serial.begin(9600);//Used for human-readable feedback. Open Serial Monitor to view.
   Serial.println("I am a robot... Bleep Bloop.");
@@ -114,6 +119,7 @@ void setup() {
 }
 
 void loop() {
+  nh.spinOnce();
 }
 
 void calibrateEncoder(int controller){
