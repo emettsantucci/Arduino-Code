@@ -87,21 +87,25 @@ const int DIG_SPEED = 50;//50/127 default speed for digger and dumper
 const int STEPPER_SPEED = 10;//10/100 default speed for raising and lowering digger and dumper
 
 /*ROS setup*/
-manual::MovementFeedback feedbackMessage;
+
 ros::NodeHandle nh;
+manual::MovementFeedback feedbackMessage;
+ros::Publisher movementFeedback ("MovementFeedback", &feedbackMessage);
 
 void messageCb( const manual::MovementCommand& msg){
+  feedbackMessage.status = msg.driveDirection;
+  feedbackMessage.message = "recieved a command";
+  movementFeedback.publish(&feedbackMessage);
   //handle command
+  nh.spinOnce();
 }
 
-ros::Subscriber<manual::MovementCommand> sub("MovementPublisher", &messageCb );
-ros::Publisher movementFeedback ("MovementFeedback", &feedbackMessage);
+ros::Subscriber<manual::MovementCommand> sub("MovementCommand", messageCb );
 
 void setup() {
   nh.initNode();
   nh.subscribe(sub);
   nh.advertise(movementFeedback);
-  nh.spinOnce();
   SWSerial.begin(9600);
   Serial.begin(9600);//Used for human-readable feedback. Open Serial Monitor to view.
   Serial.println("I am a robot... Bleep Bloop.");
@@ -115,11 +119,14 @@ void setup() {
   if(TEST_MOTORS)
     testDrive(DRIVE_SPEED);
   if(CALIBRATE_ENCODER)
-    calibrateEncoder(ENCODER_TO_CALIBRATE);
+    calibrateEncoder(ENCODER_TO_CALIBRATE);*/
 }
 
 void loop() {
   nh.spinOnce();
+  delay(1000); 
+  //need to have publisher in loop for consistent functionality
+  movementFeedback.publish(&feedbackMessage);
 }
 
 void calibrateEncoder(int controller){
